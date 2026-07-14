@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>eBay DW 字段搜索</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f0f2f5;min-height:100vh}
+
+.header{background:linear-gradient(135deg,#1a3a5c 0%,#2e6db4 100%);padding:20px 0 32px;text-align:center;color:#fff}
+.topbar{max-width:860px;margin:0 auto;padding:0 16px 10px;display:flex;justify-content:flex-end;gap:10px}
+.topbar-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:4px;font-size:12px;cursor:pointer}
+.topbar-btn:hover{background:rgba(255,255,255,.25)}
+.header h1{font-size:22px;font-weight:600;letter-spacing:1px;margin-bottom:18px}
+.search-wrap{position:relative;max-width:640px;margin:0 auto}
+.search-wrap input{width:100%;padding:13px 46px 13px 18px;font-size:15px;border:none;border-radius:8px;outline:none;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.clear-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:20px;color:#bbb;cursor:pointer;line-height:1;background:none;border:none}
+.clear-btn:hover{color:#666}
+.hint{margin-top:9px;font-size:12px;color:rgba(255,255,255,.65)}
+.ai-status{margin-top:6px;font-size:11px;color:rgba(255,255,255,.55)}
+
+.main{max-width:860px;margin:24px auto;padding:0 16px}
+.count{font-size:12px;color:#888;margin-bottom:10px}
+
+.card{background:#fff;border-radius:10px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-left:4px solid #ddd;transition:.15s}
+.card:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.card.has-group{border-left-color:#2e6db4}
+.card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.field-name{font-size:15px;font-weight:700;color:#1a1a2e;font-family:Consolas,monospace}
+.table-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;color:#fff;white-space:nowrap}
+.table-cn{font-size:11px;color:#999}
+.group-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;background:#e8f0fe;color:#1a3a5c}
+.ver-badge{font-size:11px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.ver-ok{background:#e8f5e9;color:#2e7d32}
+.ver-no{background:#ffebee;color:#c62828}
+.ver-warn{background:#fff8e1;color:#f57f17}
+.desc{margin-top:8px;font-size:13px;color:#444;line-height:1.6}
+.synonyms{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.syn-label{font-size:11px;color:#aaa;margin-right:2px}
+.syn-chip{display:inline-block;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:2px 7px;font-size:11px;font-family:Consolas,monospace;color:#333;cursor:pointer}
+.syn-chip:hover{background:#e3f2fd;border-color:#90caf9}
+.syn-tables{font-size:11px;color:#bbb}
+mark{background:#fff176;border-radius:2px;padding:0 1px}
+
+.empty{text-align:center;padding:40px 20px;color:#888}
+.empty-icon{font-size:38px;margin-bottom:10px}
+
+.ai-panel{background:#fff;border-radius:10px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.ai-panel h3{color:#1a3a5c;margin-bottom:12px;font-size:14px;font-weight:700}
+.ai-suggestions .sug-item{padding:10px 14px;border:1px solid #e8e8e8;border-radius:8px;margin-bottom:7px;cursor:pointer;transition:.12s}
+.ai-suggestions .sug-item:hover{border-color:#2e6db4;background:#f5f9ff}
+.sug-field{font-family:Consolas,monospace;font-weight:700;color:#1a3a5c;font-size:13px}
+.sug-reason{font-size:12px;color:#666;margin-top:3px}
+.gen-panel{margin-top:14px;border-top:1px solid #f0f0f0;padding-top:14px}
+.gen-panel textarea{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;min-height:65px;outline:none;font-family:inherit}
+.gen-panel textarea:focus{border-color:#2e6db4}
+.formula-box{background:#1e1e1e;border-radius:8px;padding:14px 14px 14px 16px;margin-top:8px;position:relative}
+.formula-box pre{color:#d4d4d4;font-size:12px;font-family:Consolas,monospace;white-space:pre-wrap;word-break:break-all;line-height:1.5}
+.formula-label{font-size:11px;color:#777;font-weight:600;margin:12px 0 5px;text-transform:uppercase;letter-spacing:.5px}
+.copy-btn{position:absolute;top:8px;right:8px;background:#3c3c3c;border:none;color:#bbb;padding:3px 9px;border-radius:4px;font-size:11px;cursor:pointer}
+.copy-btn:hover{background:#555;color:#fff}
+
+.btn{display:inline-block;padding:8px 18px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+.btn-primary{background:#2e6db4;color:#fff}
+.btn-primary:hover{background:#1a5a9e}
+.btn-outline{background:#fff;border:1px solid #2e6db4;color:#2e6db4}
+.btn-outline:hover{background:#f0f6ff}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #ddd;border-top-color:#2e6db4;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* key modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:10px;padding:22px;width:360px;max-width:92vw}
+.modal h3{margin-bottom:12px;color:#1a3a5c;font-size:15px}
+.modal input{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;outline:none;margin-bottom:8px;font-family:Consolas,monospace}
+.modal input:focus{border-color:#2e6db4}
+.modal-tip{font-size:11px;color:#999;margin-bottom:14px;line-height:1.5}
+.modal-row{display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="topbar">
+    <span id="ai-badge" class="ai-status">AI 未配置</span>
+    <button class="topbar-btn" onclick="openKeyModal()">⚙ SiliconFlow Key</button>
+  </div>
+  <h1>eBay DW 字段搜索</h1>
+  <div class="search-wrap">
+    <input id="q" type="text" placeholder="输入字段名或中文含义，如：卖家、运费、seller_id …"
+           oninput="onSearch()" autocomplete="off">
+    <button class="clear-btn" onclick="clearSearch()">×</button>
+  </div>
+  <div class="hint">支持中英文 · 点击同义字段可跳转 · 无结果时 AI 帮你找</div>
+</div>
+
+<div class="main" id="main">
+  <div class="empty">
+    <div class="empty-icon">🔍</div>
+    <div>在上方输入字段名或中文关键词开始搜索</div>
+    <div style="font-size:12px;margin-top:6px;color:#bbb">共加载 <span id="total">…</span> 个字段</div>
+  </div>
+</div>
+
+<!-- Key modal -->
+<div class="modal-bg" id="key-modal">
+  <div class="modal">
+    <h3>SiliconFlow API Key</h3>
+    <input id="sf-key" type="password" placeholder="sk-…">
+    <div class="modal-tip">Key 仅保存在本地浏览器，不会上传。<br>没有 Key 可在 siliconflow.cn 注册免费获取。</div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeKeyModal()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="saveKey()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let FIELDS = [];
+let debounceTimer;
+
+// ── init ──────────────────────────────────────────────────────────────
+fetch("fields.json")
+  .then(r => r.json())
+  .then(data => {
+    FIELDS = data;
+    document.getElementById("total").textContent = FIELDS.length;
+  });
+
+(function checkKey(){
+  const k = localStorage.getItem("sf_key") || "";
+  const badge = document.getElementById("ai-badge");
+  if(k){ badge.textContent = "✅ AI 已配置（DeepSeek-V3）"; badge.style.color = "rgba(200,255,200,.9)"; }
+  else  { badge.textContent = "⚠️ 未配置 AI Key"; }
+})();
+
+// ── search ────────────────────────────────────────────────────────────
+function onSearch(){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(doSearch, 150);
+}
+
+function doSearch(){
+  const q = document.getElementById("q").value.trim();
+  const main = document.getElementById("main");
+  if(!q){
+    main.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div>
+      <div>在上方输入字段名或中文关键词开始搜索</div>
+      <div style="font-size:12px;margin-top:6px;color:#bbb">共加载 <span>${FIELDS.length}</span> 个字段</div></div>`;
+    return;
+  }
+  const results = searchFields(q);
+  if(!results.length){
+    main.innerHTML = renderEmpty(q);
+    document.getElementById("btn-ai-search")
+      .addEventListener("click", () => aiSearch(window._pendingQuery));
+    return;
+  }
+  const capped = results.slice(0, 50);
+  const more = results.length > 50
+    ? `<div style="text-align:center;color:#aaa;font-size:12px;padding:8px">仅显示前50条，请缩小关键词范围</div>` : "";
+  main.innerHTML =
+    `<div class="count">找到 ${results.length} 个相关字段${results.length>50?" （显示前50条）":""}</div>` +
+    capped.map(f => renderCard(f, q)).join("") + more;
+}
+
+function clearSearch(){
+  document.getElementById("q").value = "";
+  doSearch();
+}
+
+// ── scoring ───────────────────────────────────────────────────────────
+function searchFields(q){
+  const ql = q.toLowerCase();
+  const tokens = ql.split(/\s+/).filter(Boolean);
+  const scored = FIELDS.map(f => {
+    let s = 0;
+    const fl = f.field.toLowerCase();
+    const dl = f.description.toLowerCase();
+    const tl = (f.table + " " + f.table_cn).toLowerCase();
+    const gl = f.group.toLowerCase();
+    if(fl === ql)          s += 100;
+    else if(fl.startsWith(ql)) s += 70;
+    else if(fl.includes(ql))   s += 50;
+    tokens.forEach(t => { if(dl.includes(t)) s += 40; });
+    if(dl.includes(ql))  s += 20;
+    if(tl.includes(ql))  s += 15;
+    if(gl.includes(ql))  s += 30;
+    f.synonyms.forEach(sy => { if(sy.field.toLowerCase().includes(ql)) s += 25; });
+    return {f, s};
+  }).filter(x => x.s > 0).sort((a,b) => b.s - a.s);
+  return scored.map(x => x.f);
+}
+
+// ── render ────────────────────────────────────────────────────────────
+function renderCard(f, q){
+  const verClass = f.verification.startsWith("✅") ? "ver-ok"
+                 : f.verification.startsWith("❌") ? "ver-no"
+                 : f.verification ? "ver-warn" : "";
+  const verBadge = verClass
+    ? `<span class="ver-badge ${verClass}">${f.verification.split("：")[0].split("—")[0].trim()}</span>` : "";
+  const groupTag = f.group ? `<span class="group-tag">${escHtml(f.group)}</span>` : "";
+  const synHtml = f.synonyms.length ? `
+    <div class="synonyms">
+      <span class="syn-label">同义字段：</span>
+      ${f.synonyms.map(s =>
+        `<span class="syn-chip" data-jump="${escAttr(s.field)}" title="${escAttr(s.tables)}">${escHtml(s.field)}</span>
+         <span class="syn-tables">${escHtml(s.tables)}</span>`
+      ).join("")}
+    </div>` : "";
+  return `<div class="card ${f.group?"has-group":""}">
+    <div class="card-head">
+      <span class="field-name">${highlight(f.field, q)}</span>
+      <span class="table-tag" style="background:${f.table_color}">${escHtml(f.table)}</span>
+      ${f.table_cn ? `<span class="table-cn">${escHtml(f.table_cn)}</span>` : ""}
+      ${groupTag}${verBadge}
+    </div>
+    <div class="desc">${highlight(f.description, q) || '<span style="color:#ccc">暂无描述</span>'}</div>
+    ${synHtml}
+  </div>`;
+}
+
+function renderEmpty(q){
+  window._pendingQuery = q;
+  return `<div class="empty">
+    <div class="empty-icon">😕</div>
+    <div>没有找到与 "<strong>${escHtml(q)}</strong>" 相关的字段</div>
+  </div>
+  <div class="ai-panel">
+    <h3>🤖 让 AI 帮你找</h3>
+    <p style="font-size:13px;color:#666;margin-bottom:12px">可能是描述方式不同，或者需要创建计算字段？</p>
+    <button class="btn btn-primary" id="btn-ai-search">扫描全部字段，AI 帮我找</button>
+    <div class="gen-panel">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:7px">
+        或者描述你想要的指标，AI 生成计算字段公式：
+      </div>
+      <textarea id="gen-desc" placeholder="例如：按卖家维度统计月度 GMV（美元）…"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="aiGenerate()">生成 SQL + Tableau 公式</button>
+      </div>
+    </div>
+    <div id="ai-result"></div>
+  </div>`;
+}
+
+// ── helpers ───────────────────────────────────────────────────────────
+function highlight(text, q){
+  if(!text || !q) return escHtml(text || "");
+  let r = escHtml(text);
+  q.toLowerCase().split(/\s+/).filter(Boolean).forEach(t => {
+    r = r.replace(new RegExp(escRe(t), "gi"), m => `<mark>${m}</mark>`);
+  });
+  return r;
+}
+function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escAttr(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function escRe(s)  { return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
+
+// syn-chip click delegation
+document.addEventListener("click", e => {
+  const chip = e.target.closest(".syn-chip[data-jump]");
+  if(chip){ jumpTo(chip.dataset.jump); }
+});
+
+function jumpTo(field){
+  document.getElementById("q").value = field;
+  doSearch();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+// ── AI（直接调 SiliconFlow）─────────────────────────────────────────
+function getSFKey(){
+  const k = localStorage.getItem("sf_key") || "";
+  if(!k){ openKeyModal(); return null; }
+  return k;
+}
+
+async function callAI(system, userMsg){
+  const key = getSFKey();
+  if(!key) return null;
+  const res = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: "deepseek-ai/DeepSeek-V3",
+      max_tokens: 1024,
+      messages: [
+        {role:"system", content: system},
+        {role:"user",   content: userMsg}
+      ]
+    })
+  });
+  if(!res.ok){
+    const err = await res.text();
+    throw new Error(`${res.status}: ${err}`);
+  }
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content || "";
+  const m = text.match(/\{[\s\S]*\}/);
+  if(m){ try{ return JSON.parse(m[0]); }catch(e){} }
+  return {raw: text};
+}
+
+async function aiSearch(q){
+  const resultDiv = document.getElementById("ai-result");
+  resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>AI 扫描中…</div>`;
+  const ranked = searchFields(q);
+  const pool = [...ranked, ...FIELDS.filter(f=>!ranked.includes(f))].slice(0,200);
+  const ctx = pool.map(f=>`${f.table} | ${f.field} | ${f.description}`).join("\n");
+  const system = `你是eBay数据仓库字段专家。用户搜索了某字段/指标但没找到精确匹配。请从提供的字段列表中找出最相关的（最多6个），中文解释相关原因。\n返回JSON：{"suggestions":[{"field":"字段名","table":"表名","description":"字段含义","reason":"相关原因"}]}`;
+  try{
+    const data = await callAI(system, `用户查询：${q}\n\n字段列表（table | field | description）：\n${ctx}`);
+    if(!data) return;
+    if(data.suggestions?.length){
+      resultDiv.innerHTML = `<div style="margin-top:12px">
+        <div style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:8px">AI 找到以下相关字段：</div>
+        <div class="ai-suggestions">
+          ${data.suggestions.map(s=>`
+            <div class="sug-item" data-jump="${escAttr(s.field)}">
+              <span class="sug-field">${escHtml(s.field)}</span>
+              <span class="table-tag" style="background:#546e7a;font-size:10px;margin-left:8px">${escHtml(s.table||"")}</span>
+              <div class="sug-reason">${escHtml(s.reason||s.description||"")}</div>
+            </div>`).join("")}
+        </div></div>`;
+    } else {
+      resultDiv.innerHTML = `<div style="margin-top:10px;color:#999;font-size:13px">AI 也未找到相关字段，建议使用下方生成计算字段。</div>`;
+    }
+  }catch(e){
+    resultDiv.innerHTML = `<div style="color:#c62828;font-size:13px;margin-top:10px">请求失败：${escHtml(e.message)}</div>`;
+  }
+}
+
+async function aiGenerate(){
+  const desc = document.getElementById("gen-desc").value.trim();
+  if(!desc){ alert("请描述你需要的指标"); return; }
+  const q = window._pendingQuery || "";
+  const resultDiv = document.getElementById("ai-result");
+  resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>AI 生成中…</div>`;
+  const ctx = FIELDS.filter(f=>
+    f.description.includes(q) || f.field.toLowerCase().includes(q.toLowerCase())
+  ).slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  const system = `你是eBay数据仓库专家，同时熟悉Tableau Desktop。用户需要一个现有字段中没有的计算指标，请生成：\n1. Spark SQL计算字段（可直接放在SELECT中）\n2. Tableau计算字段公式\n返回JSON：{"field_name":"建议字段名(英文下划线)","sql":"SQL公式","tableau":"Tableau公式","note":"简短说明"}`;
+  try{
+    const data = await callAI(system, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
+    if(!data) return;
+    if(data.sql || data.tableau){
+      resultDiv.innerHTML = `<div style="margin-top:12px">
+        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:3px">
+          建议字段名：<code style="background:#f5f5f5;padding:2px 6px;border-radius:3px">${escHtml(data.field_name||"")}</code>
+        </div>
+        ${data.note?`<div style="font-size:12px;color:#666;margin-bottom:10px">${escHtml(data.note)}</div>`:""}
+        ${data.sql?`<div class="formula-label">Spark SQL</div>
+          <div class="formula-box">
+            <button class="copy-btn" data-copy="${escAttr(data.sql)}">复制</button>
+            <pre>${escHtml(data.sql)}</pre>
+          </div>`:""}
+        ${data.tableau?`<div class="formula-label">Tableau</div>
+          <div class="formula-box">
+            <button class="copy-btn" data-copy="${escAttr(data.tableau)}">复制</button>
+            <pre>${escHtml(data.tableau)}</pre>
+          </div>`:""}
+      </div>`;
+    } else if(data.raw){
+      resultDiv.innerHTML = `<pre style="font-size:12px;white-space:pre-wrap;margin-top:10px;background:#f9f9f9;padding:12px;border-radius:6px">${escHtml(data.raw)}</pre>`;
+    }
+  }catch(e){
+    resultDiv.innerHTML = `<div style="color:#c62828;font-size:13px;margin-top:10px">请求失败：${escHtml(e.message)}</div>`;
+  }
+}
+
+// copy-btn & sug-item delegation
+document.addEventListener("click", e=>{
+  const copyBtn = e.target.closest(".copy-btn[data-copy]");
+  if(copyBtn){
+    navigator.clipboard.writeText(copyBtn.dataset.copy);
+    copyBtn.textContent = "已复制";
+    setTimeout(()=>copyBtn.textContent="复制", 1500);
+    return;
+  }
+  const sugItem = e.target.closest(".sug-item[data-jump]");
+  if(sugItem){ jumpTo(sugItem.dataset.jump); }
+});
+
+// ── key modal ─────────────────────────────────────────────────────────
+function openKeyModal(){
+  document.getElementById("sf-key").value = localStorage.getItem("sf_key")||"";
+  document.getElementById("key-modal").classList.add("show");
+}
+function closeKeyModal(){ document.getElementById("key-modal").classList.remove("show"); }
+function saveKey(){
+  const k = document.getElementById("sf-key").value.trim();
+  if(k){ localStorage.setItem("sf_key", k); checkKey(); }
+  closeKeyModal();
+}
+function checkKey(){
+  const k = localStorage.getItem("sf_key")||"";
+  const badge = document.getElementById("ai-badge");
+  if(k){ badge.textContent = "✅ AI 已配置（DeepSeek-V3）"; badge.style.color="rgba(200,255,200,.9)"; }
+  else  { badge.textContent = "⚠️ 未配置 AI Key"; badge.style.color=""; }
+}
+document.getElementById("key-modal").addEventListener("click", e=>{
+  if(e.target===document.getElementById("key-modal")) closeKeyModal();
+});
+</script>
+</body>
+</html>
