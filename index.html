@@ -88,6 +88,7 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
 <div class="header">
   <div class="topbar">
     <span id="ai-badge" class="ai-status">AI 未配置</span>
+    <button class="topbar-btn" onclick="openGenModal()" style="background:rgba(255,215,0,.2);border-color:rgba(255,215,0,.5)">✨ AI 生成计算字段</button>
     <button class="topbar-btn" onclick="openKeyModal()">⚙ SiliconFlow Key</button>
   </div>
   <h1>eBay DW 字段搜索</h1>
@@ -104,6 +105,21 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
     <div class="empty-icon">🔍</div>
     <div>在上方输入字段名或中文关键词开始搜索</div>
     <div style="font-size:12px;margin-top:6px;color:#bbb">共加载 <span id="total">…</span> 个字段</div>
+  </div>
+</div>
+
+<!-- Generate modal -->
+<div class="modal-bg" id="gen-modal">
+  <div class="modal" style="width:480px">
+    <h3>✨ AI 生成计算字段</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:10px">描述你需要的指标，AI 生成 Spark SQL + Tableau 公式</div>
+    <textarea id="gen-desc-modal" placeholder="例如：按卖家维度统计近7天成交额（美元）&#10;例如：计算每个 listing 的转化率（成交数/曝光数）&#10;例如：统计 GMV 同比增长率"
+      style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;min-height:80px;outline:none;font-family:inherit;margin-bottom:8px"></textarea>
+    <div id="gen-modal-result"></div>
+    <div class="modal-row">
+      <button class="btn btn-outline btn-sm" onclick="closeGenModal()">关闭</button>
+      <button class="btn btn-primary btn-sm" id="gen-modal-btn" onclick="aiGenerateModal()">生成公式</button>
+    </div>
   </div>
 </div>
 
@@ -313,7 +329,7 @@ async function aiSearch(q){
   const resultDiv = document.getElementById("ai-result");
   resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>AI 扫描中…</div>`;
   const ranked = searchFields(q);
-  const pool = [...ranked, ...FIELDS.filter(f=>!ranked.includes(f))].slice(0,200);
+  const pool = [...ranked, ...FIELDS.filter(f=>!ranked.includes(f))];
   const ctx = pool.map(f=>`${f.table} | ${f.field} | ${f.description}`).join("\n");
   const system = `你是eBay数据仓库字段专家。用户搜索了某字段/指标但没找到精确匹配。请从提供的字段列表中找出最相关的（最多6个），中文解释相关原因。\n返回JSON：{"suggestions":[{"field":"字段名","table":"表名","description":"字段含义","reason":"相关原因"}]}`;
   try{
@@ -389,6 +405,56 @@ document.addEventListener("click", e=>{
   if(sugItem){ jumpTo(sugItem.dataset.jump); }
 });
 
+// ── gen modal ─────────────────────────────────────────────────────────
+function openGenModal(){
+  document.getElementById("gen-desc-modal").value = "";
+  document.getElementById("gen-modal-result").innerHTML = "";
+  document.getElementById("gen-modal").classList.add("show");
+  setTimeout(()=>document.getElementById("gen-desc-modal").focus(), 50);
+}
+function closeGenModal(){ document.getElementById("gen-modal").classList.remove("show"); }
+
+async function aiGenerateModal(){
+  const desc = document.getElementById("gen-desc-modal").value.trim();
+  if(!desc){ alert("请描述你需要的指标"); return; }
+  const resultDiv = document.getElementById("gen-modal-result");
+  const btn = document.getElementById("gen-modal-btn");
+  resultDiv.innerHTML = `<div style="color:#888;margin-bottom:10px"><span class="spinner"></span>AI 生成中…</div>`;
+  btn.disabled = true;
+  const ctx = FIELDS.filter(f=>
+    desc.split(/\s+/).some(w=>f.description.includes(w)||f.field.toLowerCase().includes(w.toLowerCase()))
+  ).slice(0,40).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  const system = `你是eBay数据仓库专家，同时熟悉Tableau Desktop。用户需要一个计算指标，请生成：\n1. Spark SQL计算字段（可直接放在SELECT中的表达式）\n2. Tableau计算字段公式\n返回JSON：{"field_name":"建议字段名(英文下划线)","sql":"SQL公式","tableau":"Tableau公式","note":"简短说明"}`;
+  try{
+    const data = await callAI(system, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
+    if(!data){ resultDiv.innerHTML=""; btn.disabled=false; return; }
+    if(data.sql||data.tableau){
+      resultDiv.innerHTML=`
+        <div style="border-top:1px solid #f0f0f0;padding-top:12px;margin-top:4px">
+        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:4px">
+          建议字段名：<code style="background:#f5f5f5;padding:2px 6px;border-radius:3px">${escHtml(data.field_name||"")}</code>
+        </div>
+        ${data.note?`<div style="font-size:12px;color:#666;margin-bottom:8px">${escHtml(data.note)}</div>`:""}
+        ${data.sql?`<div class="formula-label">Spark SQL</div>
+          <div class="formula-box" style="margin-bottom:8px">
+            <button class="copy-btn" data-copy="${escAttr(data.sql)}">复制</button>
+            <pre>${escHtml(data.sql)}</pre>
+          </div>`:""}
+        ${data.tableau?`<div class="formula-label">Tableau</div>
+          <div class="formula-box">
+            <button class="copy-btn" data-copy="${escAttr(data.tableau)}">复制</button>
+            <pre>${escHtml(data.tableau)}</pre>
+          </div>`:""}
+        </div>`;
+    } else {
+      resultDiv.innerHTML=`<div style="color:#888;font-size:13px">AI 未返回有效公式，请换一种描述方式再试。</div>`;
+    }
+  }catch(e){
+    resultDiv.innerHTML=`<div style="color:#c62828;font-size:13px">请求失败：${escHtml(e.message)}</div>`;
+  }
+  btn.disabled=false;
+}
+
 // ── key modal ─────────────────────────────────────────────────────────
 function openKeyModal(){
   document.getElementById("sf-key").value = localStorage.getItem("sf_key")||"";
@@ -408,6 +474,9 @@ function checkKey(){
 }
 document.getElementById("key-modal").addEventListener("click", e=>{
   if(e.target===document.getElementById("key-modal")) closeKeyModal();
+});
+document.getElementById("gen-modal").addEventListener("click", e=>{
+  if(e.target===document.getElementById("gen-modal")) closeGenModal();
 });
 </script>
 </body>
