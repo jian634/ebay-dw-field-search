@@ -19,6 +19,11 @@ body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f0f2f5;min-h
 .clear-btn:hover{color:#666}
 .hint{margin-top:9px;font-size:12px;color:rgba(255,255,255,.65)}
 .ai-status{margin-top:6px;font-size:11px;color:rgba(255,255,255,.55)}
+.table-filter-wrap{max-width:640px;margin:10px auto 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.table-filter-wrap label{font-size:12px;color:rgba(255,255,255,.75)}
+.table-select{padding:5px 10px;border:1px solid rgba(255,255,255,.4);border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:12px;outline:none;cursor:pointer;max-width:360px}
+.table-select option{background:#1a3a5c;color:#fff}
+.table-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35)}
 
 .main{max-width:860px;margin:24px auto;padding:0 16px}
 .count{font-size:12px;color:#888;margin-bottom:10px}
@@ -98,6 +103,13 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
     <button class="clear-btn" onclick="clearSearch()">×</button>
   </div>
   <div class="hint">支持中英文 · 点击同义字段可跳转 · 无结果时 AI 帮你找</div>
+  <div class="table-filter-wrap">
+    <label>筛选数据表：</label>
+    <select id="table-filter" class="table-select" onchange="onTableChange()">
+      <option value="">全部表</option>
+    </select>
+    <span id="table-field-count" style="font-size:11px;color:rgba(255,255,255,.55)"></span>
+  </div>
 </div>
 
 <div class="main" id="main">
@@ -112,7 +124,13 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
 <div class="modal-bg" id="gen-modal">
   <div class="modal" style="width:480px">
     <h3>✨ AI 生成计算字段</h3>
-    <div style="font-size:12px;color:#888;margin-bottom:10px">描述你需要的指标，AI 生成 Spark SQL + Tableau 公式</div>
+    <div style="font-size:12px;color:#888;margin-bottom:8px">描述你需要的指标，AI 生成 Spark SQL + Tableau 公式</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <label style="font-size:12px;color:#555;white-space:nowrap">指定数据表：</label>
+      <select id="table-filter-modal" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:12px;outline:none;">
+        <option value="">全部表（AI自动选择字段）</option>
+      </select>
+    </div>
     <textarea id="gen-desc-modal" placeholder="例如：按卖家维度统计近7天成交额（美元）&#10;例如：计算每个 listing 的转化率（成交数/曝光数）&#10;例如：统计 GMV 同比增长率"
       style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;min-height:80px;outline:none;font-family:inherit;margin-bottom:8px"></textarea>
     <div id="gen-modal-result"></div>
@@ -146,7 +164,51 @@ fetch("fields.json")
   .then(data => {
     FIELDS = data;
     document.getElementById("total").textContent = FIELDS.length;
+    buildTableOptions();
   });
+
+function buildTableOptions(){
+  const tables = [];
+  const seen = new Set();
+  FIELDS.forEach(f=>{
+    if(!seen.has(f.table)){
+      seen.add(f.table);
+      tables.push({table:f.table, table_cn:f.table_cn||"", color:f.table_color||"#888"});
+    }
+  });
+  const makeOpts = (selId) => {
+    const sel = document.getElementById(selId);
+    if(!sel) return;
+    tables.forEach(t=>{
+      const cnt = FIELDS.filter(f=>f.table===t.table).length;
+      const opt = document.createElement("option");
+      opt.value = t.table;
+      opt.textContent = `${t.table}（${t.table_cn}）— ${cnt}个字段`;
+      sel.appendChild(opt);
+    });
+  };
+  makeOpts("table-filter");
+  makeOpts("table-filter-modal");
+}
+
+function getActiveTable(modalMode){
+  return modalMode
+    ? document.getElementById("table-filter-modal").value
+    : document.getElementById("table-filter").value;
+}
+
+function getFilteredFields(tableVal){
+  if(!tableVal) return FIELDS;
+  return FIELDS.filter(f=>f.table===tableVal);
+}
+
+function onTableChange(){
+  const tableVal = document.getElementById("table-filter").value;
+  const cnt = getFilteredFields(tableVal).length;
+  document.getElementById("table-field-count").textContent =
+    tableVal ? `共 ${cnt} 个字段` : "";
+  doSearch();
+}
 
 (function checkKey(){
   const k = localStorage.getItem("sf_key") || "";
@@ -163,14 +225,17 @@ function onSearch(){
 
 function doSearch(){
   const q = document.getElementById("q").value.trim();
+  const tableVal = getActiveTable(false);
+  const pool = getFilteredFields(tableVal);
   const main = document.getElementById("main");
   if(!q){
+    const tableLabel = tableVal ? `表 ${tableVal} 共 ${pool.length} 个字段` : `共加载 ${FIELDS.length} 个字段`;
     main.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div>
       <div>在上方输入字段名或中文关键词开始搜索</div>
-      <div style="font-size:12px;margin-top:6px;color:#bbb">共加载 <span>${FIELDS.length}</span> 个字段</div></div>`;
+      <div style="font-size:12px;margin-top:6px;color:#bbb">${tableLabel}</div></div>`;
     return;
   }
-  const results = searchFields(q);
+  const results = searchFields(q, pool);
   if(!results.length){
     main.innerHTML = renderEmpty(q);
     document.getElementById("btn-ai-search")
@@ -191,10 +256,11 @@ function clearSearch(){
 }
 
 // ── scoring ───────────────────────────────────────────────────────────
-function searchFields(q){
+function searchFields(q, pool){
+  if(!pool) pool = FIELDS;
   const ql = q.toLowerCase();
   const tokens = ql.split(/\s+/).filter(Boolean);
-  const scored = FIELDS.map(f => {
+  const scored = pool.map(f => {
     let s = 0;
     const fl = f.field.toLowerCase();
     const dl = f.description.toLowerCase();
@@ -467,13 +533,19 @@ async function aiGenerate(){
   const desc = document.getElementById("gen-desc").value.trim();
   if(!desc){ alert("请描述你需要的指标"); return; }
   const q = window._pendingQuery || "";
+  const tableVal = getActiveTable(false);
   const resultDiv = document.getElementById("ai-result");
   resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>AI 生成中…</div>`;
-  const ctx = FIELDS.filter(f=>
+  const pool = getFilteredFields(tableVal);
+  const ctx = pool.filter(f=>
     f.description.includes(q)||f.description.includes(desc.slice(0,6))||f.field.toLowerCase().includes(q.toLowerCase())
-  ).slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  ).slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n") ||
+  pool.slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  const tableConstraint = tableVal
+    ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。该表字段列表：\n${pool.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
+    : "";
   try{
-    const data = await callAI(FORMULA_SYSTEM, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
+    const data = await callAI(FORMULA_SYSTEM + tableConstraint, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
     if(!data) return;
     const html = renderFormulaResult(data);
     if(html){ resultDiv.innerHTML = html; }
@@ -508,15 +580,21 @@ function closeGenModal(){ document.getElementById("gen-modal").classList.remove(
 async function aiGenerateModal(){
   const desc = document.getElementById("gen-desc-modal").value.trim();
   if(!desc){ alert("请描述你需要的指标"); return; }
+  const tableVal = getActiveTable(true);
   const resultDiv = document.getElementById("gen-modal-result");
   const btn = document.getElementById("gen-modal-btn");
   resultDiv.innerHTML = `<div style="color:#888;margin-bottom:10px"><span class="spinner"></span>AI 生成中…</div>`;
   btn.disabled = true;
-  const ctx = FIELDS.filter(f=>
+  const pool = getFilteredFields(tableVal);
+  const ctx = pool.filter(f=>
     desc.split(/\s+/).some(w=>f.description.includes(w)||f.field.toLowerCase().includes(w.toLowerCase()))
-  ).slice(0,40).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  ).slice(0,40).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n") ||
+  pool.slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  const tableConstraint = tableVal
+    ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。该表字段列表：\n${pool.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
+    : "";
   try{
-    const data = await callAI(FORMULA_SYSTEM, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
+    const data = await callAI(FORMULA_SYSTEM + tableConstraint, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
     if(!data){ resultDiv.innerHTML=""; btn.disabled=false; return; }
     const html = renderFormulaResult(data);
     if(html){ resultDiv.innerHTML = html; }
