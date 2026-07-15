@@ -202,15 +202,23 @@ function getFilteredFields(tableVal){
   return FIELDS.filter(f=>f.table===tableVal);
 }
 
-function getTop30Fields(pool, desc){
-  const keywords = (desc||"").toLowerCase().split(/\s+/).filter(Boolean);
-  const scored = pool.map(f=>{
-    let s = 0;
-    keywords.forEach(w=>{
-      if(f.field.toLowerCase().includes(w)) s += 3;
-      if(f.description.toLowerCase().includes(w)) s += 2;
-      if((f.group||"").toLowerCase().includes(w)) s += 1;
-    });
+function getTop30Fields(pool){
+  // 按字段本身的"计算价值"打分，与用户描述无关
+  const METRIC_KW   = /gmv|amt|amount|qty|quantity|count|数量|金额|件数|price|价格|rate|比例|占比|销量|revenue|sales|sold|profit|margin|commission|fee|cost/i;
+  const DATE_KW     = /date|dt|_day|_month|_week|_year|日期|时间|月|年|周|quarter|season/i;
+  const DIM_KW      = /id$|_id|site|categ|category|brand|seller|buyer|item|type|status|level|tier|vertical|segment|country|region|品类|卖家|买家|站点|品牌|类目|层级/i;
+  const EXCLUDE_KW  = /remark|备注|注释|comment|desc(?:ription)?$|snapshot|快照|raw|temp|flag|indicator|tag/i;
+
+  const scored = pool.map((f, idx)=>{
+    const fl = f.field.toLowerCase();
+    const dl = (f.description||"").toLowerCase();
+    let s = 100 - idx; // 原始顺序兜底（越靠前越重要）
+
+    if(EXCLUDE_KW.test(fl) || EXCLUDE_KW.test(dl)) s -= 60;
+    if(METRIC_KW.test(fl) || METRIC_KW.test(dl))   s += 80;
+    if(DATE_KW.test(fl)   || DATE_KW.test(dl))      s += 50;
+    if(DIM_KW.test(fl)    || DIM_KW.test(dl))       s += 30;
+
     return {f, s};
   });
   scored.sort((a,b)=> b.s - a.s);
@@ -556,7 +564,7 @@ async function aiGenerate(){
     f.description.includes(q)||f.description.includes(desc.slice(0,6))||f.field.toLowerCase().includes(q.toLowerCase())
   ).slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n") ||
   pool.slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
-  const top30 = getTop30Fields(pool, desc);
+  const top30 = getTop30Fields(pool);
   const tableConstraint = tableVal
     ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。\n最相关的30个字段（按相关度排序）：\n${top30.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
     : "";
@@ -606,7 +614,7 @@ async function aiGenerateModal(){
     desc.split(/\s+/).some(w=>f.description.includes(w)||f.field.toLowerCase().includes(w.toLowerCase()))
   ).slice(0,40).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n") ||
   pool.slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
-  const top30 = getTop30Fields(pool, desc);
+  const top30 = getTop30Fields(pool);
   const tableConstraint = tableVal
     ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。\n最相关的30个字段（按相关度排序）：\n${top30.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
     : "";
