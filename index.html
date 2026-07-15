@@ -6,99 +6,104 @@
 <title>eBay DW 字段搜索</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f0f2f5;min-height:100vh}
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#eef1f6;min-height:100vh}
 
-.header{background:linear-gradient(135deg,#1a3a5c 0%,#2e6db4 100%);padding:20px 0 32px;text-align:center;color:#fff}
-.topbar{max-width:860px;margin:0 auto;padding:0 16px 10px;display:flex;justify-content:flex-end;gap:10px}
-.topbar-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:4px;font-size:12px;cursor:pointer}
-.topbar-btn:hover{background:rgba(255,255,255,.25)}
-.header h1{font-size:22px;font-weight:600;letter-spacing:1px;margin-bottom:18px}
-.search-wrap{position:relative;max-width:640px;margin:0 auto}
-.search-wrap input{width:100%;padding:13px 46px 13px 18px;font-size:15px;border:none;border-radius:8px;outline:none;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.header{background:linear-gradient(135deg,#0f2744 0%,#1a4a8a 60%,#2563c4 100%);padding:28px 0 36px;text-align:center;color:#fff;position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 70% 50%,rgba(100,180,255,.08) 0%,transparent 70%);pointer-events:none}
+.topbar{max-width:900px;margin:0 auto;padding:0 20px 14px;display:flex;justify-content:flex-end;gap:8px}
+.topbar-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.9);padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.topbar-btn:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.4)}
+.topbar-btn.accent{background:rgba(255,200,50,.15);border-color:rgba(255,200,50,.45);color:#ffd966}
+.topbar-btn.accent:hover{background:rgba(255,200,50,.25)}
+.header h1{font-size:26px;font-weight:700;letter-spacing:2px;margin-bottom:4px;text-shadow:0 1px 8px rgba(0,0,0,.25)}
+.header-sub{font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px;letter-spacing:.5px}
+.search-wrap{position:relative;max-width:660px;margin:0 auto}
+.search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px;color:#aaa;pointer-events:none}
+.search-wrap input{width:100%;padding:14px 46px 14px 46px;font-size:15px;border:none;border-radius:10px;outline:none;box-shadow:0 4px 20px rgba(0,0,0,.3);transition:.2s}
+.search-wrap input:focus{box-shadow:0 4px 24px rgba(37,99,196,.5)}
 .clear-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:20px;color:#bbb;cursor:pointer;line-height:1;background:none;border:none}
 .clear-btn:hover{color:#666}
-.hint{margin-top:9px;font-size:12px;color:rgba(255,255,255,.65)}
-.ai-status{margin-top:6px;font-size:11px;color:rgba(255,255,255,.55)}
-.table-filter-wrap{max-width:640px;margin:10px auto 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
-.table-filter-wrap label{font-size:12px;color:rgba(255,255,255,.75)}
-.table-select{padding:5px 10px;border:1px solid rgba(255,255,255,.4);border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:12px;outline:none;cursor:pointer;max-width:360px}
+.hint{margin-top:10px;font-size:12px;color:rgba(255,255,255,.55);letter-spacing:.3px}
+.key-status{margin-top:4px;font-size:11px;color:rgba(255,255,255,.4)}
+.table-filter-wrap{max-width:660px;margin:14px auto 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.table-filter-wrap label{font-size:12px;color:rgba(255,255,255,.7);white-space:nowrap}
+.table-select{padding:6px 12px;border:1px solid rgba(255,255,255,.3);border-radius:7px;background:rgba(255,255,255,.1);color:#fff;font-size:12px;outline:none;cursor:pointer;max-width:380px;backdrop-filter:blur(4px)}
 .table-select option{background:#1a3a5c;color:#fff}
 .table-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35)}
 .card{cursor:pointer}
-.detail-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.detail-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
 .detail-modal-bg.show{display:flex}
-.detail-modal{background:#fff;border-radius:12px;padding:0;width:560px;max-width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.2)}
-.detail-header{padding:20px 22px 14px;border-bottom:1px solid #f0f0f0;flex-shrink:0}
-.detail-field-name{font-size:20px;font-weight:700;color:#1a1a2e;font-family:Consolas,monospace;margin-bottom:8px}
-.detail-body{padding:18px 22px;overflow-y:auto;flex:1}
-.detail-row{margin-bottom:14px}
-.detail-label{font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-.detail-value{font-size:13px;color:#333;line-height:1.7}
+.detail-modal{background:#fff;border-radius:14px;padding:0;width:580px;max-width:95vw;max-height:87vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 12px 50px rgba(0,0,0,.25)}
+.detail-header{padding:22px 24px 15px;border-bottom:1px solid #f0f0f0;flex-shrink:0;background:linear-gradient(135deg,#f8faff,#fff)}
+.detail-field-name{font-size:21px;font-weight:700;color:#1a1a2e;font-family:Consolas,monospace;margin-bottom:9px}
+.detail-body{padding:20px 24px;overflow-y:auto;flex:1}
+.detail-row{margin-bottom:16px}
+.detail-label{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+.detail-value{font-size:13px;color:#333;line-height:1.75}
 .detail-ver{display:inline-block;padding:4px 10px;border-radius:5px;font-size:12px;margin-top:4px}
-.detail-footer{padding:12px 22px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;flex-shrink:0}
-.syn-chip-detail{display:inline-block;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:3px 9px;font-size:12px;font-family:Consolas,monospace;color:#333;cursor:pointer;margin:2px}
+.detail-footer{padding:14px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;flex-shrink:0;background:#fafafa}
+.syn-chip-detail{display:inline-block;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:5px;padding:3px 10px;font-size:12px;font-family:Consolas,monospace;color:#333;cursor:pointer;margin:2px}
 .syn-chip-detail:hover{background:#e3f2fd;border-color:#90caf9}
 
-.main{max-width:860px;margin:24px auto;padding:0 16px}
-.count{font-size:12px;color:#888;margin-bottom:10px}
+.main{max-width:900px;margin:28px auto;padding:0 20px}
+.count{font-size:12px;color:#999;margin-bottom:12px;padding:0 2px}
 
-.card{background:#fff;border-radius:10px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-left:4px solid #ddd;transition:.15s}
-.card:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.card{background:#fff;border-radius:12px;padding:17px 22px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.07);border-left:4px solid #e0e5ef;transition:.18s}
+.card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1);transform:translateY(-1px);border-left-color:#4a90d9}
 .card.has-group{border-left-color:#2e6db4}
 .card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .field-name{font-size:15px;font-weight:700;color:#1a1a2e;font-family:Consolas,monospace}
-.table-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;color:#fff;white-space:nowrap}
-.table-cn{font-size:11px;color:#999}
-.group-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;background:#e8f0fe;color:#1a3a5c}
-.ver-badge{font-size:11px;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.table-tag{display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;color:#fff;white-space:nowrap}
+.table-cn{font-size:11px;color:#aaa}
+.group-tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;background:#ebf0fe;color:#2553b0;font-weight:500}
+.ver-badge{font-size:11px;padding:2px 8px;border-radius:5px;white-space:nowrap;font-weight:500}
 .ver-ok{background:#e8f5e9;color:#2e7d32}
 .ver-no{background:#ffebee;color:#c62828}
 .ver-warn{background:#fff8e1;color:#f57f17}
-.desc{margin-top:8px;font-size:13px;color:#444;line-height:1.6}
-.synonyms{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
-.syn-label{font-size:11px;color:#aaa;margin-right:2px}
-.syn-chip{display:inline-block;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:2px 7px;font-size:11px;font-family:Consolas,monospace;color:#333;cursor:pointer}
-.syn-chip:hover{background:#e3f2fd;border-color:#90caf9}
-.syn-tables{font-size:11px;color:#bbb}
+.desc{margin-top:9px;font-size:13px;color:#555;line-height:1.65}
+.synonyms{margin-top:9px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.syn-label{font-size:11px;color:#bbb;margin-right:2px}
+.syn-chip{display:inline-block;background:#f7f7f7;border:1px solid #e5e5e5;border-radius:5px;padding:2px 8px;font-size:11px;font-family:Consolas,monospace;color:#444;cursor:pointer;transition:.12s}
+.syn-chip:hover{background:#e3f2fd;border-color:#90caf9;color:#1565c0}
+.syn-tables{font-size:11px;color:#ccc}
 mark{background:#fff176;border-radius:2px;padding:0 1px}
 
-.empty{text-align:center;padding:40px 20px;color:#888}
-.empty-icon{font-size:38px;margin-bottom:10px}
+.empty{text-align:center;padding:60px 20px;color:#aaa}
+.empty-icon{font-size:44px;margin-bottom:14px;filter:grayscale(.3)}
 
-.ai-panel{background:#fff;border-radius:10px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
-.ai-panel h3{color:#1a3a5c;margin-bottom:12px;font-size:14px;font-weight:700}
-.ai-suggestions .sug-item{padding:10px 14px;border:1px solid #e8e8e8;border-radius:8px;margin-bottom:7px;cursor:pointer;transition:.12s}
-.ai-suggestions .sug-item:hover{border-color:#2e6db4;background:#f5f9ff}
+.assist-panel{background:#fff;border-radius:12px;padding:22px 24px;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:10px}
+.assist-panel h3{color:#1a3a5c;margin-bottom:12px;font-size:14px;font-weight:700}
+.ai-suggestions .sug-item{padding:11px 15px;border:1px solid #eaeaea;border-radius:9px;margin-bottom:7px;cursor:pointer;transition:.14s}
+.ai-suggestions .sug-item:hover{border-color:#2e6db4;background:#f5f9ff;box-shadow:0 2px 8px rgba(46,109,180,.08)}
 .sug-field{font-family:Consolas,monospace;font-weight:700;color:#1a3a5c;font-size:13px}
-.sug-reason{font-size:12px;color:#666;margin-top:3px}
-.gen-panel{margin-top:14px;border-top:1px solid #f0f0f0;padding-top:14px}
-.gen-panel textarea{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;min-height:65px;outline:none;font-family:inherit}
-.gen-panel textarea:focus{border-color:#2e6db4}
-.formula-box{background:#1e1e1e;border-radius:8px;padding:14px 14px 14px 16px;margin-top:8px;position:relative}
-.formula-box pre{color:#d4d4d4;font-size:12px;font-family:Consolas,monospace;white-space:pre-wrap;word-break:break-all;line-height:1.5}
-.formula-label{font-size:11px;color:#777;font-weight:600;margin:12px 0 5px;text-transform:uppercase;letter-spacing:.5px}
-.copy-btn{position:absolute;top:8px;right:8px;background:#3c3c3c;border:none;color:#bbb;padding:3px 9px;border-radius:4px;font-size:11px;cursor:pointer}
+.sug-reason{font-size:12px;color:#777;margin-top:3px}
+.gen-panel{margin-top:15px;border-top:1px solid #f0f0f0;padding-top:15px}
+.gen-panel textarea{width:100%;padding:10px 13px;border:1px solid #ddd;border-radius:7px;font-size:13px;resize:vertical;min-height:65px;outline:none;font-family:inherit;transition:.15s}
+.gen-panel textarea:focus{border-color:#2e6db4;box-shadow:0 0 0 3px rgba(46,109,180,.1)}
+.formula-box{background:#1e1e1e;border-radius:9px;padding:14px 14px 14px 16px;margin-top:8px;position:relative}
+.formula-box pre{color:#d4d4d4;font-size:12px;font-family:Consolas,monospace;white-space:pre-wrap;word-break:break-all;line-height:1.55}
+.formula-label{font-size:11px;color:#888;font-weight:700;margin:13px 0 5px;text-transform:uppercase;letter-spacing:.7px}
+.copy-btn{position:absolute;top:8px;right:8px;background:#3c3c3c;border:none;color:#bbb;padding:3px 9px;border-radius:4px;font-size:11px;cursor:pointer;transition:.12s}
 .copy-btn:hover{background:#555;color:#fff}
 
-.btn{display:inline-block;padding:8px 18px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
-.btn-primary{background:#2e6db4;color:#fff}
-.btn-primary:hover{background:#1a5a9e}
-.btn-outline{background:#fff;border:1px solid #2e6db4;color:#2e6db4}
+.btn{display:inline-block;padding:8px 18px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+.btn-primary{background:#2563c4;color:#fff;box-shadow:0 2px 8px rgba(37,99,196,.25)}
+.btn-primary:hover{background:#1a52a8;box-shadow:0 4px 12px rgba(37,99,196,.35)}
+.btn-outline{background:#fff;border:1px solid #2563c4;color:#2563c4}
 .btn-outline:hover{background:#f0f6ff}
-.btn-sm{padding:5px 12px;font-size:12px}
+.btn-sm{padding:5px 13px;font-size:12px}
 .btn-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid #ddd;border-top-color:#2e6db4;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #ddd;border-top-color:#2563c4;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* key modal */
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
 .modal-bg.show{display:flex}
-.modal{background:#fff;border-radius:10px;padding:22px;width:360px;max-width:92vw}
-.modal h3{margin-bottom:12px;color:#1a3a5c;font-size:15px}
-.modal input{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;outline:none;margin-bottom:8px;font-family:Consolas,monospace}
-.modal input:focus{border-color:#2e6db4}
-.modal-tip{font-size:11px;color:#999;margin-bottom:14px;line-height:1.5}
+.modal{background:#fff;border-radius:12px;padding:24px;width:380px;max-width:92vw;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.modal h3{margin-bottom:13px;color:#1a3a5c;font-size:15px;font-weight:700}
+.modal input{width:100%;padding:9px 13px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none;margin-bottom:8px;font-family:Consolas,monospace;transition:.15s}
+.modal input:focus{border-color:#2563c4;box-shadow:0 0 0 3px rgba(37,99,196,.1)}
+.modal-tip{font-size:11px;color:#aaa;margin-bottom:15px;line-height:1.6}
 .modal-row{display:flex;gap:8px;justify-content:flex-end}
 </style>
 </head>
@@ -106,23 +111,25 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
 
 <div class="header">
   <div class="topbar">
-    <span id="ai-badge" class="ai-status">AI 未配置</span>
-    <button class="topbar-btn" onclick="openGenModal()" style="background:rgba(255,215,0,.2);border-color:rgba(255,215,0,.5)">✨ AI 生成计算字段</button>
-    <button class="topbar-btn" onclick="openKeyModal()">⚙ SiliconFlow Key</button>
+    <span id="ai-badge" class="key-status"></span>
+    <button class="topbar-btn accent" onclick="openGenModal()">⚡ 公式生成器</button>
+    <button class="topbar-btn" onclick="openKeyModal()">⚙ 接口配置</button>
   </div>
   <h1>eBay DW 字段搜索</h1>
+  <div class="header-sub">Data Warehouse · 数据字典</div>
   <div class="search-wrap">
+    <span class="search-icon">🔍</span>
     <input id="q" type="text" placeholder="输入字段名或中文含义，如：卖家、运费、seller_id …"
            oninput="onSearch()" autocomplete="off">
     <button class="clear-btn" onclick="clearSearch()">×</button>
   </div>
-  <div class="hint">支持中英文 · 点击同义字段可跳转 · 无结果时 AI 帮你找</div>
+  <div class="hint">支持中英文 · 点击同义字段可跳转 · 共 <span id="total" style="font-weight:600;color:#fff">…</span> 个字段</div>
   <div class="table-filter-wrap">
     <label>筛选数据表：</label>
     <select id="table-filter" class="table-select" onchange="onTableChange()">
       <option value="">全部表</option>
     </select>
-    <span id="table-field-count" style="font-size:11px;color:rgba(255,255,255,.55)"></span>
+    <span id="table-field-count" style="font-size:11px;color:rgba(255,255,255,.5)"></span>
   </div>
 </div>
 
@@ -130,23 +137,23 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
   <div class="empty">
     <div class="empty-icon">🔍</div>
     <div>在上方输入字段名或中文关键词开始搜索</div>
-    <div style="font-size:12px;margin-top:6px;color:#bbb">共加载 <span id="total">…</span> 个字段</div>
+    <div style="font-size:12px;margin-top:6px;color:#ccc">支持字段名 · 中文含义 · 同义词联想</div>
   </div>
 </div>
 
 <!-- Generate modal -->
 <div class="modal-bg" id="gen-modal">
-  <div class="modal" style="width:480px">
-    <h3>✨ AI 生成计算字段</h3>
-    <div style="font-size:12px;color:#888;margin-bottom:8px">描述你需要的指标，AI 生成 Spark SQL + Tableau 公式</div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <label style="font-size:12px;color:#555;white-space:nowrap">指定数据表：</label>
-      <select id="table-filter-modal" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:12px;outline:none;">
-        <option value="">全部表（AI自动选择字段）</option>
+  <div class="modal" style="width:500px">
+    <h3>⚡ 公式生成器</h3>
+    <div style="font-size:12px;color:#999;margin-bottom:10px">描述你需要的指标，自动生成 Spark SQL + Tableau 计算字段</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <label style="font-size:12px;color:#666;white-space:nowrap">指定数据表：</label>
+      <select id="table-filter-modal" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;">
+        <option value="">全部表（自动选择字段）</option>
       </select>
     </div>
     <textarea id="gen-desc-modal" placeholder="例如：按卖家维度统计近7天成交额（美元）&#10;例如：计算每个 listing 的转化率（成交数/曝光数）&#10;例如：统计 GMV 同比增长率"
-      style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;min-height:80px;outline:none;font-family:inherit;margin-bottom:8px"></textarea>
+      style="width:100%;padding:10px 13px;border:1px solid #ddd;border-radius:7px;font-size:13px;resize:vertical;min-height:85px;outline:none;font-family:inherit;margin-bottom:10px"></textarea>
     <div id="gen-modal-result"></div>
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeGenModal()">关闭</button>
@@ -193,9 +200,9 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
 <!-- Key modal -->
 <div class="modal-bg" id="key-modal">
   <div class="modal">
-    <h3>SiliconFlow API Key</h3>
+    <h3>接口配置</h3>
     <input id="sf-key" type="password" placeholder="sk-…">
-    <div class="modal-tip">Key 仅保存在本地浏览器，不会上传。<br>没有 Key 可在 siliconflow.cn 注册免费获取。</div>
+    <div class="modal-tip">Key 仅保存在本地浏览器，不会上传到任何服务器。</div>
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeKeyModal()">取消</button>
       <button class="btn btn-primary btn-sm" onclick="saveKey()">保存</button>
@@ -285,8 +292,8 @@ function onTableChange(){
 (function checkKey(){
   const k = localStorage.getItem("sf_key") || "";
   const badge = document.getElementById("ai-badge");
-  if(k){ badge.textContent = "✅ AI 已配置（DeepSeek-V3）"; badge.style.color = "rgba(200,255,200,.9)"; }
-  else  { badge.textContent = "⚠️ 未配置 AI Key"; }
+  if(k){ badge.textContent = "✅ 接口已配置"; badge.style.color = "rgba(200,255,200,.85)"; }
+  else  { badge.textContent = ""; }
 })();
 
 // ── search ────────────────────────────────────────────────────────────
@@ -310,7 +317,7 @@ function doSearch(){
   const results = searchFields(q, pool);
   if(!results.length){
     main.innerHTML = renderEmpty(q);
-    document.getElementById("btn-ai-search")
+    document.getElementById("btn-smart-search")
       .addEventListener("click", () => aiSearch(window._pendingQuery));
     return;
   }
@@ -384,14 +391,15 @@ function renderEmpty(q){
   return `<div class="empty">
     <div class="empty-icon">😕</div>
     <div>没有找到与 "<strong>${escHtml(q)}</strong>" 相关的字段</div>
+    <div style="font-size:12px;margin-top:6px;color:#ccc">试试同义词、英文缩写，或使用下方智能查找</div>
   </div>
-  <div class="ai-panel">
-    <h3>🤖 让 AI 帮你找</h3>
-    <p style="font-size:13px;color:#666;margin-bottom:12px">可能是描述方式不同，或者需要创建计算字段？</p>
-    <button class="btn btn-primary" id="btn-ai-search">扫描全部字段，AI 帮我找</button>
+  <div class="assist-panel">
+    <h3>🔎 智能字段推荐</h3>
+    <p style="font-size:13px;color:#777;margin-bottom:12px">可能是描述方式不同，或者需要创建计算字段？</p>
+    <button class="btn btn-primary" id="btn-smart-search">扫描全部字段，智能推荐</button>
     <div class="gen-panel">
       <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:7px">
-        或者描述你想要的指标，AI 生成计算字段公式：
+        或者描述你想要的指标，生成计算字段公式：
       </div>
       <textarea id="gen-desc" placeholder="例如：按卖家维度统计月度 GMV（美元）…"></textarea>
       <div class="btn-row">
@@ -628,7 +636,7 @@ async function callAI(system, userMsg){
 
 async function aiSearch(q){
   const resultDiv = document.getElementById("ai-result");
-  resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>AI 扫描中…</div>`;
+  resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>扫描中…</div>`;
   const ranked = searchFields(q);
   const pool = [...ranked, ...FIELDS.filter(f=>!ranked.includes(f))];
   const ctx = pool.map(f=>`${f.table} | ${f.field} | ${f.description}`).join("\n");
@@ -638,7 +646,7 @@ async function aiSearch(q){
     if(!data) return;
     if(data.suggestions?.length){
       resultDiv.innerHTML = `<div style="margin-top:12px">
-        <div style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:8px">AI 找到以下相关字段：</div>
+        <div style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:8px">找到以下相关字段：</div>
         <div class="ai-suggestions">
           ${data.suggestions.map(s=>`
             <div class="sug-item" data-jump="${escAttr(s.field)}">
@@ -648,7 +656,7 @@ async function aiSearch(q){
             </div>`).join("")}
         </div></div>`;
     } else {
-      resultDiv.innerHTML = `<div style="margin-top:10px;color:#999;font-size:13px">AI 也未找到相关字段，建议使用下方生成计算字段。</div>`;
+      resultDiv.innerHTML = `<div style="margin-top:10px;color:#999;font-size:13px">未找到相关字段，建议使用下方生成计算字段。</div>`;
     }
   }catch(e){
     resultDiv.innerHTML = `<div style="color:#c62828;font-size:13px;margin-top:10px">请求失败：${escHtml(e.message)}</div>`;
@@ -661,7 +669,7 @@ async function aiGenerate(){
   const q = window._pendingQuery || "";
   const tableVal = getActiveTable(false);
   const resultDiv = document.getElementById("ai-result");
-  resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>AI 生成中…</div>`;
+  resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>生成中…</div>`;
   const pool = getFilteredFields(tableVal);
   const ctx = pool.filter(f=>
     f.description.includes(q)||f.description.includes(desc.slice(0,6))||f.field.toLowerCase().includes(q.toLowerCase())
@@ -710,7 +718,7 @@ async function aiGenerateModal(){
   const tableVal = getActiveTable(true);
   const resultDiv = document.getElementById("gen-modal-result");
   const btn = document.getElementById("gen-modal-btn");
-  resultDiv.innerHTML = `<div style="color:#888;margin-bottom:10px"><span class="spinner"></span>AI 生成中…</div>`;
+  resultDiv.innerHTML = `<div style="color:#888;margin-bottom:10px"><span class="spinner"></span>生成中…</div>`;
   btn.disabled = true;
   const pool = getFilteredFields(tableVal);
   const ctx = pool.filter(f=>
@@ -726,7 +734,7 @@ async function aiGenerateModal(){
     if(!data){ resultDiv.innerHTML=""; btn.disabled=false; return; }
     const html = renderFormulaResult(data);
     if(html){ resultDiv.innerHTML = html; }
-    else { resultDiv.innerHTML=`<div style="color:#888;font-size:13px">AI 未返回有效公式，请换一种描述方式再试。</div>`; }
+    else { resultDiv.innerHTML=`<div style="color:#888;font-size:13px">未生成有效公式，请换一种描述方式再试。</div>`; }
   }catch(e){
     resultDiv.innerHTML=`<div style="color:#c62828;font-size:13px">请求失败：${escHtml(e.message)}</div>`;
   }
@@ -747,8 +755,8 @@ function saveKey(){
 function checkKey(){
   const k = localStorage.getItem("sf_key")||"";
   const badge = document.getElementById("ai-badge");
-  if(k){ badge.textContent = "✅ AI 已配置（DeepSeek-V3）"; badge.style.color="rgba(200,255,200,.9)"; }
-  else  { badge.textContent = "⚠️ 未配置 AI Key"; badge.style.color=""; }
+  if(k){ badge.textContent = "✅ 接口已配置"; badge.style.color="rgba(200,255,200,.85)"; }
+  else  { badge.textContent = ""; badge.style.color=""; }
 }
 document.getElementById("key-modal").addEventListener("click", e=>{
   if(e.target===document.getElementById("key-modal")) closeKeyModal();
