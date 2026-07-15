@@ -24,6 +24,20 @@ body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f0f2f5;min-h
 .table-select{padding:5px 10px;border:1px solid rgba(255,255,255,.4);border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:12px;outline:none;cursor:pointer;max-width:360px}
 .table-select option{background:#1a3a5c;color:#fff}
 .table-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35)}
+.card{cursor:pointer}
+.detail-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.detail-modal-bg.show{display:flex}
+.detail-modal{background:#fff;border-radius:12px;padding:0;width:560px;max-width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+.detail-header{padding:20px 22px 14px;border-bottom:1px solid #f0f0f0;flex-shrink:0}
+.detail-field-name{font-size:20px;font-weight:700;color:#1a1a2e;font-family:Consolas,monospace;margin-bottom:8px}
+.detail-body{padding:18px 22px;overflow-y:auto;flex:1}
+.detail-row{margin-bottom:14px}
+.detail-label{font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.detail-value{font-size:13px;color:#333;line-height:1.7}
+.detail-ver{display:inline-block;padding:4px 10px;border-radius:5px;font-size:12px;margin-top:4px}
+.detail-footer{padding:12px 22px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;flex-shrink:0}
+.syn-chip-detail{display:inline-block;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:3px 9px;font-size:12px;font-family:Consolas,monospace;color:#333;cursor:pointer;margin:2px}
+.syn-chip-detail:hover{background:#e3f2fd;border-color:#90caf9}
 
 .main{max-width:860px;margin:24px auto;padding:0 16px}
 .count{font-size:12px;color:#888;margin-bottom:10px}
@@ -137,6 +151,41 @@ mark{background:#fff176;border-radius:2px;padding:0 1px}
     <div class="modal-row">
       <button class="btn btn-outline btn-sm" onclick="closeGenModal()">关闭</button>
       <button class="btn btn-primary btn-sm" id="gen-modal-btn" onclick="aiGenerateModal()">生成公式</button>
+    </div>
+  </div>
+</div>
+
+<!-- Field detail modal -->
+<div class="detail-modal-bg" id="detail-modal" onclick="if(event.target===this)closeFieldDetail()">
+  <div class="detail-modal">
+    <div class="detail-header">
+      <div class="detail-field-name" id="dm-field"></div>
+      <div id="dm-badges" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-row">
+        <div class="detail-label">字段含义</div>
+        <div class="detail-value" id="dm-desc"></div>
+      </div>
+      <div class="detail-row" id="dm-group-row">
+        <div class="detail-label">分组</div>
+        <div class="detail-value" id="dm-group"></div>
+      </div>
+      <div class="detail-row" id="dm-ver-row">
+        <div class="detail-label">验证结论</div>
+        <div class="detail-value" id="dm-ver"></div>
+      </div>
+      <div class="detail-row" id="dm-syn-row">
+        <div class="detail-label">同义字段（点击跳转）</div>
+        <div class="detail-value" id="dm-syn"></div>
+      </div>
+      <div class="detail-row" style="background:#f9f9f9;border-radius:6px;padding:10px 12px">
+        <div class="detail-label" style="margin-bottom:2px">样本数据</div>
+        <div style="font-size:12px;color:#aaa">可在 Muse Data Lake Studio 执行 SELECT * FROM <span id="dm-table-name" style="font-family:Consolas;color:#888"></span> LIMIT 10 查看</div>
+      </div>
+    </div>
+    <div class="detail-footer">
+      <button class="btn btn-outline btn-sm" onclick="closeFieldDetail()">关闭</button>
     </div>
   </div>
 </div>
@@ -318,7 +367,7 @@ function renderCard(f, q){
          <span class="syn-tables">${escHtml(s.tables)}</span>`
       ).join("")}
     </div>` : "";
-  return `<div class="card ${f.group?"has-group":""}">
+  return `<div class="card ${f.group?"has-group":""}" onclick="openFieldDetail('${escAttr(f.field)}','${escAttr(f.table)}')">
     <div class="card-head">
       <span class="field-name">${highlight(f.field, q)}</span>
       <span class="table-tag" style="background:${f.table_color}">${escHtml(f.table)}</span>
@@ -397,6 +446,14 @@ function renderFormulaResult(data){
     `<div style="background:#e3f2fd;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px;color:#1565c0">
       💡 <strong>使用建议：</strong>${escHtml(data.usage)}
     </div>` : "";
+  const joinHtml = data.join_needed && data.join_hint ?
+    `<div style="background:#f3e5f5;border:1px solid #ce93d8;border-radius:6px;padding:10px 12px;margin-top:8px;font-size:12px;color:#6a1b9a">
+      🔗 <strong>需要跨表 JOIN：</strong>
+      <div class="formula-box" style="margin-top:6px;background:#2d1b3d">
+        <button class="copy-btn" data-copy="${escAttr(data.join_hint)}">复制</button>
+        <pre style="color:#e1bee7">${escHtml(data.join_hint)}</pre>
+      </div>
+    </div>` : "";
   return `
     <div style="border-top:1px solid #f0f0f0;padding-top:12px;margin-top:4px">
     <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:4px">
@@ -414,6 +471,7 @@ function renderFormulaResult(data){
         <pre>${escHtml(data.tableau)}</pre>
       </div>${warnHtml}`:""}
     ${usageHtml}
+    ${joinHtml}
     </div>`;
 }
 
@@ -470,10 +528,20 @@ SQL: ROUND(SUM(CASE WHEN rnk<=3 THEN sold_qty ELSE 0 END)*100.0/SUM(sold_qty),1)
 Tableau: ROUND(SUM(IF [rnk]<=3 THEN [sold_qty] ELSE 0 END)/SUM([sold_qty])*100,1)
 usage: 体现属性的市场集中程度，越高说明买家需求越集中
 
+【跨表JOIN检测】
+如果指标需要从多张表取数，必须在join_hint中提供完整SQL框架。
+常见JOIN关系（ON条件必须写准确）：
+- dw_checkout_trans cki JOIN dw_lstg_item l ON cki.item_id = l.item_id
+- dw_checkout_trans cki JOIN Cate_ENG c ON cki.leaf_categ_id = c.leaf_categ_id AND cki.site_id = c.site
+- dw_checkout_trans cki JOIN AMS_ERS_NAME a ON cki.slr_id = a.seller_id
+- dw_checkout_trans cki JOIN SLR_BYR_MAPPING s ON cki.slr_id = s.slr_id
+- dw_lstg_item l JOIN LEAF_ENG le ON l.leaf_categ_id = le.leaf_categ_id
+- dw_lstg_item l JOIN CBT_SLR_vertical v ON l.item_id = v.item_id
+
 请生成：
 1. Spark SQL计算字段（可直接放在SELECT中）
 2. Tableau计算字段公式
-返回JSON（必须包含usage字段）：{"field_name":"建议字段名(英文下划线)","sql":"SQL公式","tableau":"Tableau公式","note":"简短说明","usage":"在Tableau中的使用建议，具体说明放在哪里/怎么用"}`;
+返回JSON（所有字段必填）：{"field_name":"建议字段名(英文下划线)","sql":"SQL公式","tableau":"Tableau公式","note":"简短说明","usage":"在Tableau中的使用建议","join_needed":true或false,"join_hint":"若join_needed=true，写出完整SQL框架：SELECT ... FROM tableA a JOIN tableB b ON a.key=b.key WHERE ... 否则留空字符串"}`;
 
 // syn-chip click delegation
 document.addEventListener("click", e => {
@@ -486,6 +554,41 @@ function jumpTo(field){
   doSearch();
   window.scrollTo({top:0, behavior:"smooth"});
 }
+
+// ── 字段详情弹窗 ──────────────────────────────────────────────────────
+function openFieldDetail(fieldName, tableName){
+  const f = FIELDS.find(x=>x.field===fieldName && x.table===tableName) || FIELDS.find(x=>x.field===fieldName);
+  if(!f) return;
+  document.getElementById("dm-field").textContent = f.field;
+  const badges = document.getElementById("dm-badges");
+  badges.innerHTML = `<span class="table-tag" style="background:${f.table_color||'#888'}">${escHtml(f.table)}</span>
+    ${f.table_cn?`<span style="font-size:12px;color:#666">${escHtml(f.table_cn)}</span>`:""}
+    ${f.group?`<span class="group-tag">${escHtml(f.group)}</span>`:""}`;
+  document.getElementById("dm-desc").textContent = f.description || "暂无描述";
+  document.getElementById("dm-table-name").textContent = f.table;
+  const groupRow = document.getElementById("dm-group-row");
+  const groupEl  = document.getElementById("dm-group");
+  if(f.group){ groupEl.textContent=f.group; groupRow.style.display=""; }
+  else groupRow.style.display="none";
+  const verRow = document.getElementById("dm-ver-row");
+  const verEl  = document.getElementById("dm-ver");
+  if(f.verification){
+    const cls = f.verification.startsWith("✅")?"ver-ok":f.verification.startsWith("❌")?"ver-no":"ver-warn";
+    verEl.innerHTML=`<span class="detail-ver ${cls}" style="white-space:pre-wrap">${escHtml(f.verification)}</span>`;
+    verRow.style.display="";
+  } else verRow.style.display="none";
+  const synRow = document.getElementById("dm-syn-row");
+  const synEl  = document.getElementById("dm-syn");
+  if(f.synonyms && f.synonyms.length){
+    synEl.innerHTML = f.synonyms.map(s=>
+      `<span class="syn-chip-detail" onclick="closeFieldDetail();jumpTo('${escAttr(s.field)}')">${escHtml(s.field)}</span>
+       <span style="font-size:11px;color:#bbb">${escHtml(s.tables||"")}</span>`
+    ).join("<br>");
+    synRow.style.display="";
+  } else synRow.style.display="none";
+  document.getElementById("detail-modal").classList.add("show");
+}
+function closeFieldDetail(){ document.getElementById("detail-modal").classList.remove("show"); }
 
 // ── AI（直接调 SiliconFlow）─────────────────────────────────────────
 function getSFKey(){
