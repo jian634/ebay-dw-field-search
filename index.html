@@ -202,6 +202,21 @@ function getFilteredFields(tableVal){
   return FIELDS.filter(f=>f.table===tableVal);
 }
 
+function getTop30Fields(pool, desc){
+  const keywords = (desc||"").toLowerCase().split(/\s+/).filter(Boolean);
+  const scored = pool.map(f=>{
+    let s = 0;
+    keywords.forEach(w=>{
+      if(f.field.toLowerCase().includes(w)) s += 3;
+      if(f.description.toLowerCase().includes(w)) s += 2;
+      if((f.group||"").toLowerCase().includes(w)) s += 1;
+    });
+    return {f, s};
+  });
+  scored.sort((a,b)=> b.s - a.s);
+  return scored.slice(0,30).map(x=>x.f);
+}
+
 function onTableChange(){
   const tableVal = document.getElementById("table-filter").value;
   const cnt = getFilteredFields(tableVal).length;
@@ -541,8 +556,9 @@ async function aiGenerate(){
     f.description.includes(q)||f.description.includes(desc.slice(0,6))||f.field.toLowerCase().includes(q.toLowerCase())
   ).slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n") ||
   pool.slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  const top30 = getTop30Fields(pool, desc);
   const tableConstraint = tableVal
-    ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。该表字段列表：\n${pool.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
+    ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。\n最相关的30个字段（按相关度排序）：\n${top30.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
     : "";
   try{
     const data = await callAI(FORMULA_SYSTEM + tableConstraint, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
@@ -590,8 +606,9 @@ async function aiGenerateModal(){
     desc.split(/\s+/).some(w=>f.description.includes(w)||f.field.toLowerCase().includes(w.toLowerCase()))
   ).slice(0,40).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n") ||
   pool.slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
+  const top30 = getTop30Fields(pool, desc);
   const tableConstraint = tableVal
-    ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。该表字段列表：\n${pool.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
+    ? `\n\n⛔ 用户已锁定数据表：${tableVal}\n只能使用该表的字段，严禁使用其他表的字段。\n最相关的30个字段（按相关度排序）：\n${top30.map(f=>`- ${f.field}：${f.description}`).join("\n")}`
     : "";
   try{
     const data = await callAI(FORMULA_SYSTEM + tableConstraint, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
