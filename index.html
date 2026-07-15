@@ -277,6 +277,115 @@ function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
 function escAttr(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function escRe(s)  { return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
 
+// ── 字段校验 & 公式渲染 ────────────────────────────────────────────────
+const ADS_SCHEMA = [
+  "CATEG_LVL7_NAME","attr_name","attr_value","listing_count",
+  "sold_qty","attr_total_sold","rnk","value_pct","cumul_pct"
+];
+function buildKnownFields(){
+  const s = new Set(ADS_SCHEMA.map(f=>f.toLowerCase()));
+  FIELDS.forEach(f=>s.add(f.field.toLowerCase()));
+  return s;
+}
+const KNOWN_FIELDS = buildKnownFields();
+
+function validateTableauFormula(formula){
+  const matches = formula.match(/\[([^\]]+)\]/g) || [];
+  return matches.map(m=>m.slice(1,-1))
+    .filter(f=> !KNOWN_FIELDS.has(f.toLowerCase().trim()) && !/^\d/.test(f) && f.trim().length>1);
+}
+
+function renderFormulaResult(data){
+  if(!(data.sql||data.tableau)) return "";
+  const tableauWarnings = data.tableau ? validateTableauFormula(data.tableau) : [];
+  const warnHtml = data.tableau ? (tableauWarnings.length ?
+    `<div style="background:#fff3e0;border:1px solid #ffb300;border-radius:6px;padding:8px 12px;margin-top:6px;font-size:12px;color:#e65100">
+      ⚠️ Tableau公式含未知字段：<strong>${tableauWarnings.map(escHtml).join("、")}</strong><br>
+      <span style="color:#999;font-size:11px">请在搜索框核对字段名，或检查大小写</span>
+    </div>` :
+    `<div style="background:#e8f5e9;border:1px solid #66bb6a;border-radius:6px;padding:6px 12px;margin-top:6px;font-size:12px;color:#2e7d32">✅ 字段名已通过校验，可直接在 Tableau 创建计算字段</div>`) : "";
+  const usageHtml = data.usage ?
+    `<div style="background:#e3f2fd;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px;color:#1565c0">
+      💡 <strong>使用建议：</strong>${escHtml(data.usage)}
+    </div>` : "";
+  return `
+    <div style="border-top:1px solid #f0f0f0;padding-top:12px;margin-top:4px">
+    <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:4px">
+      建议字段名：<code style="background:#f5f5f5;padding:2px 6px;border-radius:3px">${escHtml(data.field_name||"")}</code>
+    </div>
+    ${data.note?`<div style="font-size:12px;color:#666;margin-bottom:8px">${escHtml(data.note)}</div>`:""}
+    ${data.sql?`<div class="formula-label">Spark SQL</div>
+      <div class="formula-box" style="margin-bottom:8px">
+        <button class="copy-btn" data-copy="${escAttr(data.sql)}">复制</button>
+        <pre>${escHtml(data.sql)}</pre>
+      </div>`:""}
+    ${data.tableau?`<div class="formula-label">Tableau</div>
+      <div class="formula-box">
+        <button class="copy-btn" data-copy="${escAttr(data.tableau)}">复制</button>
+        <pre>${escHtml(data.tableau)}</pre>
+      </div>${warnHtml}`:""}
+    ${usageHtml}
+    </div>`;
+}
+
+const FORMULA_SYSTEM = `你是eBay数据仓库专家，同时熟悉Tableau Desktop。
+
+【ADS分析表字段（涉及属性/listing/销量时必须使用，不得自创字段名）】
+表名: ads_sg_attr_pareto / dws_sg_attr_value_agg
+- CATEG_LVL7_NAME: 品类名称
+- attr_name: 属性名（如Color、Size）
+- attr_value: 属性值（如Black、L）
+- listing_count: listing数量
+- sold_qty: 销售数量(件)
+- attr_total_sold: 属性总销量
+- rnk: 销量排名（1=最畅销）
+- value_pct: 属性值占比(%)
+- cumul_pct: 累计占比(%)
+
+【Spark SQL 语法规则】
+- 字段名直接写，不加括号：sold_qty, listing_count
+- 聚合：SUM(), COUNT(), ROUND(x,2), CASE WHEN ... THEN ... ELSE ... END
+- 正确: ROUND(SUM(sold_qty)/SUM(listing_count),2)
+- 错误: ROUND(AVG(quantity_sold),2) ← 字段名不存在
+
+【Tableau 计算字段语法规则】
+- 字段名必须加方括号：[sold_qty], [listing_count]
+- 聚合：SUM([field]), AVG([field]), COUNT([field])
+- 条件：IF [rnk]<=3 THEN "Top3" ELSE "其他" END
+- 正确: ROUND(SUM([sold_qty])/SUM([listing_count]),2)
+- 错误: ROUND(AVG(sold_qty),2) ← 缺方括号且字段名错
+
+【Few-shot示例】
+需求: 平均每个listing卖出几件
+SQL: ROUND(SUM(sold_qty)/SUM(listing_count),2)
+Tableau: ROUND(SUM([sold_qty])/SUM([listing_count]),2)
+usage: 放在属性值明细图的Label或Tooltip上，体现各属性值的畅销程度
+
+需求: 属性值是否属于Top3畅销
+SQL: CASE WHEN rnk<=3 THEN 'Top3' ELSE '其他' END
+Tableau: IF [rnk]<=3 THEN "Top3" ELSE "其他" END
+usage: 放在Color维度作为分组标记，可在条形图上高亮Top3
+
+需求: 是否已覆盖80%市场
+SQL: CASE WHEN cumul_pct>=80 THEN '已覆盖' ELSE '未到80%' END
+Tableau: IF SUM([cumul_pct])>=80 THEN "✅已覆盖" ELSE "未到80%" END
+usage: 在Pareto曲线上做参考线标注
+
+需求: 近7天交易GMV（用DW表）
+SQL: SUM(gmv_amt)
+Tableau: SUM([Gmv Amt])
+usage: 放在卖家/品类维度的汇总表中
+
+需求: 属性竞争集中度（头部3个值占总销量的比例）
+SQL: ROUND(SUM(CASE WHEN rnk<=3 THEN sold_qty ELSE 0 END)*100.0/SUM(sold_qty),1)
+Tableau: ROUND(SUM(IF [rnk]<=3 THEN [sold_qty] ELSE 0 END)/SUM([sold_qty])*100,1)
+usage: 体现属性的市场集中程度，越高说明买家需求越集中
+
+请生成：
+1. Spark SQL计算字段（可直接放在SELECT中）
+2. Tableau计算字段公式
+返回JSON（必须包含usage字段）：{"field_name":"建议字段名(英文下划线)","sql":"SQL公式","tableau":"Tableau公式","note":"简短说明","usage":"在Tableau中的使用建议，具体说明放在哪里/怎么用"}`;
+
 // syn-chip click delegation
 document.addEventListener("click", e => {
   const chip = e.target.closest(".syn-chip[data-jump]");
@@ -361,32 +470,14 @@ async function aiGenerate(){
   const resultDiv = document.getElementById("ai-result");
   resultDiv.innerHTML = `<div style="margin-top:12px;color:#888"><span class="spinner"></span>AI 生成中…</div>`;
   const ctx = FIELDS.filter(f=>
-    f.description.includes(q) || f.field.toLowerCase().includes(q.toLowerCase())
+    f.description.includes(q)||f.description.includes(desc.slice(0,6))||f.field.toLowerCase().includes(q.toLowerCase())
   ).slice(0,30).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
-  const system = `你是eBay数据仓库专家，同时熟悉Tableau Desktop。\n\n【分析表字段（涉及属性/listing/销量时必须使用，不得自创字段名）】\n表名: ads_sg_attr_pareto / dws_sg_attr_value_agg\n- CATEG_LVL7_NAME: 品类名称\n- attr_name: 属性名\n- attr_value: 属性值\n- listing_count: listing数量\n- sold_qty: 销售数量(件)\n- attr_total_sold: 属性总销量\n- rnk: 销量排名\n- value_pct: 属性值占比(%)\n- cumul_pct: 累计占比(%)\n\n【Spark SQL 语法规则】\n- 字段名直接写，不加括号：sold_qty, listing_count\n- 聚合函数：SUM(), COUNT(), AVG(), ROUND(x, 2)\n- 正确示例：ROUND(SUM(sold_qty) / SUM(listing_count), 2)\n- 错误示例：ROUND(AVG(quantity_sold), 2)  ← 字段名错误\n\n【Tableau 计算字段语法规则】\n- 字段名必须用方括号：[sold_qty], [listing_count]\n- 聚合函数：SUM([field]), AVG([field]), COUNT([field])\n- 正确示例：ROUND(SUM([sold_qty]) / SUM([listing_count]), 2)\n- 错误示例：ROUND(AVG([quantity_sold]), 2)  ← 字段名错误\n- 错误示例：ROUND(AVG(sold_qty), 2)  ← 缺少方括号\n\n请生成：\n1. Spark SQL计算字段（可直接放在SELECT中）\n2. Tableau计算字段公式\n返回JSON：{"field_name":"建议字段名(英文下划线)","sql":"SQL公式","tableau":"Tableau公式","note":"简短说明"}`;
   try{
-    const data = await callAI(system, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
+    const data = await callAI(FORMULA_SYSTEM, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
     if(!data) return;
-    if(data.sql || data.tableau){
-      resultDiv.innerHTML = `<div style="margin-top:12px">
-        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:3px">
-          建议字段名：<code style="background:#f5f5f5;padding:2px 6px;border-radius:3px">${escHtml(data.field_name||"")}</code>
-        </div>
-        ${data.note?`<div style="font-size:12px;color:#666;margin-bottom:10px">${escHtml(data.note)}</div>`:""}
-        ${data.sql?`<div class="formula-label">Spark SQL</div>
-          <div class="formula-box">
-            <button class="copy-btn" data-copy="${escAttr(data.sql)}">复制</button>
-            <pre>${escHtml(data.sql)}</pre>
-          </div>`:""}
-        ${data.tableau?`<div class="formula-label">Tableau</div>
-          <div class="formula-box">
-            <button class="copy-btn" data-copy="${escAttr(data.tableau)}">复制</button>
-            <pre>${escHtml(data.tableau)}</pre>
-          </div>`:""}
-      </div>`;
-    } else if(data.raw){
-      resultDiv.innerHTML = `<pre style="font-size:12px;white-space:pre-wrap;margin-top:10px;background:#f9f9f9;padding:12px;border-radius:6px">${escHtml(data.raw)}</pre>`;
-    }
+    const html = renderFormulaResult(data);
+    if(html){ resultDiv.innerHTML = html; }
+    else if(data.raw){ resultDiv.innerHTML = `<pre style="font-size:12px;white-space:pre-wrap;margin-top:10px;background:#f9f9f9;padding:12px;border-radius:6px">${escHtml(data.raw)}</pre>`; }
   }catch(e){
     resultDiv.innerHTML = `<div style="color:#c62828;font-size:13px;margin-top:10px">请求失败：${escHtml(e.message)}</div>`;
   }
@@ -424,31 +515,12 @@ async function aiGenerateModal(){
   const ctx = FIELDS.filter(f=>
     desc.split(/\s+/).some(w=>f.description.includes(w)||f.field.toLowerCase().includes(w.toLowerCase()))
   ).slice(0,40).map(f=>`${f.table}.${f.field}：${f.description}`).join("\n");
-  const system = `你是eBay数据仓库专家，同时熟悉Tableau Desktop。\n\n【分析表字段（涉及属性/listing/销量时必须使用，不得自创字段名）】\n表名: ads_sg_attr_pareto / dws_sg_attr_value_agg\n- CATEG_LVL7_NAME: 品类名称\n- attr_name: 属性名\n- attr_value: 属性值\n- listing_count: listing数量\n- sold_qty: 销售数量(件)\n- attr_total_sold: 属性总销量\n- rnk: 销量排名\n- value_pct: 属性值占比(%)\n- cumul_pct: 累计占比(%)\n\n【Spark SQL 语法规则】\n- 字段名直接写，不加括号：sold_qty, listing_count\n- 聚合函数：SUM(), COUNT(), AVG(), ROUND(x, 2)\n- 正确示例：ROUND(SUM(sold_qty) / SUM(listing_count), 2)\n- 错误示例：ROUND(AVG(quantity_sold), 2)  ← 字段名错误\n\n【Tableau 计算字段语法规则】\n- 字段名必须用方括号：[sold_qty], [listing_count]\n- 聚合函数：SUM([field]), AVG([field]), COUNT([field])\n- 正确示例：ROUND(SUM([sold_qty]) / SUM([listing_count]), 2)\n- 错误示例：ROUND(AVG([quantity_sold]), 2)  ← 字段名错误\n- 错误示例：ROUND(AVG(sold_qty), 2)  ← 缺少方括号\n\n请生成：\n1. Spark SQL计算字段（可直接放在SELECT中的表达式）\n2. Tableau计算字段公式\n返回JSON：{"field_name":"建议字段名(英文下划线)","sql":"SQL公式","tableau":"Tableau公式","note":"简短说明"}`;
   try{
-    const data = await callAI(system, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
+    const data = await callAI(FORMULA_SYSTEM, `需要的指标：${desc}\n\n可参考的相关字段：\n${ctx}`);
     if(!data){ resultDiv.innerHTML=""; btn.disabled=false; return; }
-    if(data.sql||data.tableau){
-      resultDiv.innerHTML=`
-        <div style="border-top:1px solid #f0f0f0;padding-top:12px;margin-top:4px">
-        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:4px">
-          建议字段名：<code style="background:#f5f5f5;padding:2px 6px;border-radius:3px">${escHtml(data.field_name||"")}</code>
-        </div>
-        ${data.note?`<div style="font-size:12px;color:#666;margin-bottom:8px">${escHtml(data.note)}</div>`:""}
-        ${data.sql?`<div class="formula-label">Spark SQL</div>
-          <div class="formula-box" style="margin-bottom:8px">
-            <button class="copy-btn" data-copy="${escAttr(data.sql)}">复制</button>
-            <pre>${escHtml(data.sql)}</pre>
-          </div>`:""}
-        ${data.tableau?`<div class="formula-label">Tableau</div>
-          <div class="formula-box">
-            <button class="copy-btn" data-copy="${escAttr(data.tableau)}">复制</button>
-            <pre>${escHtml(data.tableau)}</pre>
-          </div>`:""}
-        </div>`;
-    } else {
-      resultDiv.innerHTML=`<div style="color:#888;font-size:13px">AI 未返回有效公式，请换一种描述方式再试。</div>`;
-    }
+    const html = renderFormulaResult(data);
+    if(html){ resultDiv.innerHTML = html; }
+    else { resultDiv.innerHTML=`<div style="color:#888;font-size:13px">AI 未返回有效公式，请换一种描述方式再试。</div>`; }
   }catch(e){
     resultDiv.innerHTML=`<div style="color:#c62828;font-size:13px">请求失败：${escHtml(e.message)}</div>`;
   }
